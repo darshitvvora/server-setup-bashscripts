@@ -43,7 +43,7 @@ echo -e "
 #                                                                              #
 #                                                                              #
 #                                                                              #
-#                 \e[34mWelcome to Metabase App Installer\e[39m                            #
+#                 \e[34mWelcome to CentOS App Installer\e[39m                            #
 #                                                                              #
 #                                                                              # 
 #                                                                              #
@@ -169,7 +169,8 @@ configureIPTables(){
 }
 
 configureSSL(){
-	read -n1 -p "Would you like configure SSL certificate? [y,n]" doit 
+	read -n1 -p "Would you like configure SSL certificate? [y,n]" 
+	doit 
 	case $doit in  
 	  y|Y) 
 		echo "\nPaste value of SSL bundle cert file, followed by [ENTER]:\n"
@@ -276,7 +277,8 @@ setupNginxConf(){
 
 	rm $NGINX_PATH
 
-	echo "server {
+	echo "
+	server {
 	       listen         80;
 	       server_name    $SUBDOMAIN.$HOST;
 	       return         301 https://$server_name$request_uri;
@@ -296,7 +298,7 @@ setupNginxConf(){
     			fastcgi_read_timeout 1200s;
                 proxy_set_header X-Forwarded-Host $host;
                 proxy_set_header X-Forwarded-Server $host;
-                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
                 proxy_pass http://localhost:$PORT_NUMBER/;
 	        }
 	}" >> $NGINX_PATH
