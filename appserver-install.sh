@@ -60,7 +60,7 @@ setDomainName(){
 	echo "Type the Domain name you would like to configure, followed by [ENTER]:"
 	read HOST
 	
-	if [ -z "$HOST" ]; then
+	if [ -n "$HOST" ]; then
 		echo "Setting Hostname: $host"
 		hostname $HOST
 	else
@@ -72,10 +72,7 @@ setDomainName(){
 addUser(){
 	echo "Adding $USERNAME user"
 	useradd $1
-
-	echo "Type the password for $USERNAME, followed by [ENTER]:"
-	read PASSWORD
-	passwd $PASSWORD
+	passwd $1
 
 	echo  "Adding user:$USERNAME to sudoers\n"
 	usermod $USERNAME -aG wheel
@@ -112,7 +109,7 @@ setTimeZone(){
 	echo "Type the timezone for server. Example of valid timezone Asia/Kolkata, followed by [ENTER]:"
 	read TIMEZONE
 	echo "Setting up timezone to $TIMEZONE\n"
-	TIMEZONEPATH = "/usr/share/zoneinfo/$TIMEZONE"
+	TIMEZONEPATH="/usr/share/zoneinfo/$TIMEZONE"
 	rm /etc/localtime
 	ln -s $TIMEZONEPATH /etc/localtime
 }
@@ -126,7 +123,7 @@ removeFirewall(){
 
 installAppDependencies(){
 	echo "Installing nginx nodejs wget tar nano & iptables"
-	yum install nginx nodejs iptables-services tar wget nano -y
+	yum install nginx nodejs iptables-services tar wget nano htop -y
 	npm i -g n
 	n lts
 }
@@ -168,16 +165,21 @@ configureSSL(){
 	read -n1 -p "Would you like configure SSL certificate? [y,n]" doit 
 	case $doit in  
 	  y|Y) 
-		echo "Paste value of SSL bundle cert file, followed by [ENTER]:"
+		echo "\nPaste value of SSL bundle cert file, followed by [ENTER]:\n"
 		read SSLCert
 
-		echo "Paste value of SSL private key, followed by [ENTER]:"
+		echo "Paste value of SSL private key, followed by [ENTER]:\n"
 		read SSLKey
 
 		mkdir /etc/nginx/ssl 
 
-		SSLCertPath = "/etc/nginx/ssl/star.$HOST.crt"
-		SSLKeyPath = "/etc/nginx/ssl/$HOST.key"
+
+		SSLCertPath="/etc/nginx/ssl/star.$HOST.crt"
+		SSLKeyPath="/etc/nginx/ssl/$HOST.key"
+
+		rm $SSLCertPath
+		rm $SSLKeyPath
+
 		echo "$SSLCert" >> $SSLCertPath
 		echo "$SSLKey" >> $SSLKeyPath
 		echo "SSL configured with nginx successfully\n"
@@ -187,12 +189,10 @@ configureSSL(){
 }
 
 installApplication(){
-	echo "Downloading Oracle Java. Please Wait...\n"
-	wget --no-cookies --no-check-certificate --header "Cookie:oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/8u121-b13/e9e7ea248e2c4826b92b3f075a80e441/jdk-8u121-linux-x64.rpm"
 
 	echo "Oracle Java download successful\n"
 	echo "Installing Java"
-	yum localinstall jdk-8u121-linux-x64.rpm
+	yum install java-11-openjdk-devel
 
 	echo "Java installed successfully\n"
 
@@ -201,15 +201,18 @@ installApplication(){
 	echo "Please enter the version of Metabase you would like to install, followed by [ENTER]:"
 	read METABASE_VERSION
 
-	METABASE_DOWNLOAD_URL = "http://downloads.metabase.com/v$METABASE_VERSION/metabase.jar"
+	METABASE_DOWNLOAD_URL="http://downloads.metabase.com/v$METABASE_VERSION/metabase.jar"
+	echo $METABASE_DOWNLOAD_URL
 
-	wget METABASE_DOWNLOAD_URL
+	wget $METABASE_DOWNLOAD_URL
 
 	java -jar metabase.jar
 
 	mv metabase.jar /var/metabase.jar
 
 	echo "Creating metabase system service"
+
+	rm /etc/systemd/system/metabase.service
 
 	cat >> /etc/systemd/system/metabase.service <<EOL
 [Unit]
@@ -229,14 +232,14 @@ SyslogIdentifier=metabase
 WantedBy=multi-user.target
 EOL
 
-	echo "Starting metabase service"
-	systemctl start metabase
+
 
 	echo "Enabling metabase service to start on boot"
 	systemctl enable metabase
 
-	echo "Checking status metabase service"
-	systemctl status metabase
+	echo "Starting metabase service"
+	systemctl start metabase
+
 
 }
 
@@ -244,23 +247,27 @@ setupNginxConf(){
 	echo "Please enter subdomain for application, default will be app followed by [ENTER]:"
 	read SUBDOMAIN
 
-	if [ -z "$SUBDOMAIN" ]; then
+	if [ -n "$SUBDOMAIN" ]; then
+		echo "Storing subdomain"
 
 	else
-		SUBDOMAIN= "app"
+		SUBDOMAIN="app"
 	fi
 
 	echo "Please enter port for your application, default will be 3000 followed by [ENTER]:"
 	read PORT_NUMBER
 
 
-	if [ -z "$PORT_NUMBER" ]; then
+	if [ -n "$PORT_NUMBER" ]; then
+		echo "Storing Port"
 
 	else
-		PORT_NUMBER= "3000"
+		PORT_NUMBER="3000"
 	fi
 
-	NGINX_PATH = "/etc/nginx/conf.d/$SUBDOMAIN.$HOST.conf"
+	NGINX_PATH="/etc/nginx/conf.d/$SUBDOMAIN.$HOST.conf"
+
+	rm $NGINX_PATH
 
 	echo "server {
 	       listen         80;
@@ -271,19 +278,19 @@ setupNginxConf(){
 	    server_name  $SUBDOMAIN.$HOST;
 	    listen 443 ssl;
 	    ssl on;
-	    ssl_certificate /etc/nginx/ssl/ssl-bundle.crt;
-	    ssl_certificate_key /etc/nginx/ssl/star.quezx.com.key;
+	    ssl_certificate $SSLCert;
+	    ssl_certificate_key $SSLKey;
 	    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
 	        location / {
-	                #include cors_support;
-	    			proxy_send_timeout 1200s;
-	    			proxy_read_timeout 1200s;
-	    			fastcgi_send_timeout 1200s;
-	    			fastcgi_read_timeout 1200s;
-	                proxy_set_header X-Forwarded-Host $host;
-	                proxy_set_header X-Forwarded-Server $host;
-	                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-	                proxy_pass http://localhost:$PORT_NUMBER/;
+                #include cors_support;
+    			proxy_send_timeout 1200s;
+    			proxy_read_timeout 1200s;
+    			fastcgi_send_timeout 1200s;
+    			fastcgi_read_timeout 1200s;
+                proxy_set_header X-Forwarded-Host $host;
+                proxy_set_header X-Forwarded-Server $host;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_pass http://localhost:$PORT_NUMBER/;
 	        }
 	}" >> $NGINX_PATH
 
@@ -297,7 +304,7 @@ setupNginxConf(){
 ## Start of script
 readUser
 
-if [ -z "$USERNAME" ]; then
+if [ -n "$USERNAME" ]; then
 	addUser $USERNAME
 else
 	echo "Please enter valid username"
