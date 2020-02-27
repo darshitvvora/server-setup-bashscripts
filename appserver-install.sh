@@ -54,6 +54,13 @@ echo -e "
 readUser(){
 	echo "Type the username you would like to add, followed by [ENTER]:"
 	read USERNAME
+
+	if [ -n "$USERNAME" ]; then
+		addUser $USERNAME
+	else
+		echo "Please enter valid username"
+		readUser
+	fi
 }
 
 setDomainName(){
@@ -294,8 +301,9 @@ setupNginxConf(){
 	        }
 	}" >> $NGINX_PATH
 
-	systemctl start nginx 
 	systemctl enable nginx
+	systemctl start nginx 
+	
 
 	echo "Please check application on $SUBDOMAIN.$HOST"
 
@@ -303,13 +311,6 @@ setupNginxConf(){
 
 ## Start of script
 readUser
-
-if [ -n "$USERNAME" ]; then
-	addUser $USERNAME
-else
-	echo "Please enter valid username"
-	readUser
-fi
 
 # Setting IP Address
 IP=$(curl ipinfo.io/ip)
