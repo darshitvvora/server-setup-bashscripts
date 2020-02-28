@@ -212,17 +212,22 @@ installApplication(){
 	METABASE_DOWNLOAD_URL="http://downloads.metabase.com/v$METABASE_VERSION/metabase.jar"
 	echo $METABASE_DOWNLOAD_URL
 
-	wget $METABASE_DOWNLOAD_URL
+	sudo su - $USERNAME -c wget $METABASE_DOWNLOAD_URL
 
-	java -jar metabase.jar
+	chmod +x metabase.jar
 
-	mv metabase.jar /var/metabase.jar
+	sudo su - $USERNAME -c java -jar metabase.jar
+
+	sudo su - $USERNAME -c mkdir apps
+
+	sudo su - $USERNAME -c mv metabase.jar ~/apps/metabase.jar
 
 	echo "Creating metabase system service"
 
 	rm /etc/systemd/system/metabase.service
 
-	cat >> /etc/systemd/system/metabase.service <<EOL
+
+	echo "
 [Unit]
 Description=Metabase server
 After=syslog.target
@@ -230,7 +235,7 @@ After=network.target
 [Service]
 User=root
 Type=simple
-ExecStart=/bin/java -jar /var/metabase.jar
+ExecStart=/bin/java -jar /home/$USERNAME/apps/metabase.jar
 Restart=always
 StandardOutput=syslog
 StandardError=syslog
@@ -238,8 +243,7 @@ SyslogIdentifier=metabase
 
 [Install]
 WantedBy=multi-user.target
-EOL
-
+" >> /etc/systemd/system/metabase.service
 
 
 	echo "Enabling metabase service to start on boot"
@@ -247,7 +251,6 @@ EOL
 
 	echo "Starting metabase service"
 	systemctl start metabase
-
 
 }
 
@@ -333,6 +336,8 @@ installAppDependencies
 configureIPTables
 
 configureSSL
+
+changeUser
 
 installApplication
 
